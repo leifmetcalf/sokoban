@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 
 #define ROWS 10
@@ -7,7 +7,7 @@
 #define MAX_BOXES 100
 #define MAX_HISTORY 1000
 
-enum base {NONE, WALL, STORAGE};
+enum base { NONE, WALL, STORAGE };
 
 struct pos {
   int row;
@@ -42,9 +42,7 @@ int add_single_wall(struct reader *reader, struct state *state, int r, int c) {
   return false;
 }
 
-void print_invalid_loc() {
-  printf("Location out of bounds\n");
-}
+void print_invalid_loc() { printf("Location out of bounds\n"); }
 
 void add_wall(struct reader *reader, struct state *state, int r, int c) {
   if (!add_single_wall(reader, state, r, c)) {
@@ -52,7 +50,8 @@ void add_wall(struct reader *reader, struct state *state, int r, int c) {
   }
 }
 
-void add_walls(struct reader *reader, struct state *state, int r1, int c1, int r2, int c2) {
+void add_walls(struct reader *reader, struct state *state, int r1, int c1,
+               int r2, int c2) {
   if (!(in_bounds(r1, c1) || in_bounds(r2, c2))) {
     print_invalid_loc();
     return;
@@ -90,7 +89,8 @@ void add_box(struct reader *reader, struct state *state, int r, int c) {
   state->box_pos[n] = p;
 }
 
-void link_boxes(struct reader *reader, struct state *state, int r1, int c1, int r2, int c2) {
+void link_boxes(struct reader *reader, struct state *state, int r1, int c1,
+                int r2, int c2) {
   if (!in_bounds(r1, c1) || !in_bounds(r2, c2)) {
     printf("Invalid Location(s)\n");
     return;
@@ -111,7 +111,7 @@ void link_boxes(struct reader *reader, struct state *state, int r1, int c1, int 
     int b = reader->links[l2][i];
     reader->box_link[b] = l1;
     reader->links[l1][l1_len + i] = b;
-  } 
+  }
   reader->link_sizes[l1] += l2_len;
 }
 
@@ -130,16 +130,18 @@ struct pos pos_plus(struct pos p, char d) {
   return p;
 }
 
-void move_box(struct reader *reader, struct state *state, struct pos p, char d, int seen[ROWS][COLS]) {
+void move_box(struct reader *reader, struct state *state, struct pos p, char d,
+              int seen[ROWS][COLS]) {
   int r = p.row;
   int c = p.col;
-  if (seen[r][c]) return;
+  if (seen[r][c])
+    return;
   seen[r][c] = 1;
   int b = state->boxes[r][c];
   if (b == 0) {
     if (reader->board[r][c] == WALL) {
       seen[r][c] = 2;
-    } 
+    }
     return;
   }
   struct pos pp = pos_plus(p, d);
@@ -233,7 +235,7 @@ void print_title() {
 
 void print_board(struct reader *reader, struct state *state) {
   print_title();
-  for (int r  = 0; r < ROWS; r++) {
+  for (int r = 0; r < ROWS; r++) {
     print_line();
     for (int c = 0; c < COLS; c++) {
       printf("|");
