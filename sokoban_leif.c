@@ -30,27 +30,56 @@ struct reader {
   struct state history[MAX_HISTORY];
 };
 
-int add_single_wall(struct reader *reader, struct state *state, int row, int col) {
-  reader->board[row][col] = WALL;
+int in_bounds(int r, int c) {
+  return (0 <= r && r < ROWS && 0 <= c && c < COLS);
 }
 
-void add_wall(struct reader *reader, struct state *state, int row, int col) {
-  add_single_wall(reader, state, row, col);
+int add_single_wall(struct reader *reader, struct state *state, int r, int c) {
+  if (in_bounds(r, c)) {
+    reader->board[r][c] = WALL;
+    return true;
+  }
+  return false;
+}
+
+void print_invalid_loc() {
+  printf("Location out of bounds\n");
+}
+
+void add_wall(struct reader *reader, struct state *state, int r, int c) {
+  if (!add_single_wall(reader, state, r, c)) {
+    print_invalid_loc();
+  }
 }
 
 void add_walls(struct reader *reader, struct state *state, int r1, int c1, int r2, int c2) {
-  for (int row = r1; row <= r2; row++) {
-    for (int col = c1; col <= c2; col++) {
-      add_single_wall(reader, state, row, col);
+  if (!(in_bounds(r1, c1) || in_bounds(r2, c2))) {
+    print_invalid_loc();
+    return;
+  }
+  for (int r = r1; r <= r2; r++) {
+    for (int c = c1; c <= c2; c++) {
+      add_single_wall(reader, state, r, c);
     }
   }
 }
 
-void add_storage(struct reader *reader, struct state *state, int row, int col) {
-  reader->board[row][col] = STORAGE;
+void add_storage(struct reader *reader, struct state *state, int r, int c) {
+  if (!in_bounds(r, c)) {
+    print_invalid_loc();
+    return;
+  }
+  reader->board[r][c] = STORAGE;
 }
 
 void add_box(struct reader *reader, struct state *state, int r, int c) {
+  if (!in_bounds(r, c)) {
+    print_invalid_loc();
+    return;
+  }
+  if (reader->board[r][c] == WALL) {
+    reader->board[r][c] = NONE;
+  }
   reader->n_boxes++;
   int n = reader->n_boxes;
   reader->box_link[n] = n;
@@ -62,8 +91,20 @@ void add_box(struct reader *reader, struct state *state, int r, int c) {
 }
 
 void link_boxes(struct reader *reader, struct state *state, int r1, int c1, int r2, int c2) {
-  int l1 = reader->box_link[state->boxes[r1][c1]];
-  int l2 = reader->box_link[state->boxes[r2][c2]];
+  if (!in_bounds(r1, c1) || !in_bounds(r2, c2)) {
+    printf("Invalid Location(s)\n");
+    return;
+  }
+  int b1 = state->boxes[r1][c1];
+  int b2 = state->boxes[r2][c2];
+  if (b1 == 0 || b2 == 0) {
+    printf("Location not box(s)\n");
+  }
+  int l1 = reader->box_link[b1];
+  int l2 = reader->box_link[b2];
+  if (l1 == l2) {
+    return;
+  }
   int l1_len = reader->link_sizes[l1];
   int l2_len = reader->link_sizes[l2];
   for (int i = 0; i < l2_len; i++) {
