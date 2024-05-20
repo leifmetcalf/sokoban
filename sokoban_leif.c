@@ -64,22 +64,34 @@ void add_box(struct reader *reader, struct state *state, int r, int c) {
 void link_boxes(struct reader *reader, struct state *state, int r1, int c1, int r2, int c2) {
   int l1 = reader->box_link[state->boxes[r1][c1]];
   int l2 = reader->box_link[state->boxes[r2][c2]];
-
   int l1_len = reader->link_sizes[l1];
   int l2_len = reader->link_sizes[l2];
-
   for (int i = 0; i < l2_len; i++) {
     int b = reader->links[l2][i];
     reader->box_link[b] = l1;
     reader->links[l1][l1_len + i] = b;
   } 
-
   reader->link_sizes[l1] += l2_len;
 }
 
-void move_box(struct reader *reader, struct state *state, struct pos box, int dr, int dc, int seen[ROWS][COLS]) {
-  int r = box.row;
-  int c = box.col;
+struct pos pos_plus(struct pos p, char d) {
+  if (d == 'w') {
+    p.row--;
+  } else if (d == 'a') {
+    p.col--;
+  } else if (d == 's') {
+    p.row++;
+  } else if (d == 'd') {
+    p.col++;
+  }
+  p.row = (p.row + ROWS) % ROWS;
+  p.col = (p.col + COLS) % COLS;
+  return p;
+}
+
+void move_box(struct reader *reader, struct state *state, struct pos p, char d, int seen[ROWS][COLS]) {
+  int r = p.row;
+  int c = p.col;
   if (seen[r][c]) return;
   seen[r][c] = 1;
   int b = state->boxes[r][c];
@@ -89,11 +101,11 @@ void move_box(struct reader *reader, struct state *state, struct pos box, int dr
     } 
     return;
   }
-  int rr = (r + dr + ROWS) % ROWS;
-  int cc = (c + dc + COLS) % COLS;
-  struct pos pp = {rr, cc};
+  struct pos pp = pos_plus(p, d);
+  int rr = pp.row;
+  int cc = pp.col;
   state->boxes[r][c] = 0;
-  move_box(reader, state, pp, dr, dc, seen);
+  move_box(reader, state, pp, d, seen);
   if (seen[rr][cc] == 1) {
     state->boxes[rr][cc] = b;
     state->box_pos[b] = pp;
@@ -102,16 +114,14 @@ void move_box(struct reader *reader, struct state *state, struct pos box, int dr
     seen[r][c] = 2;
   }
   for (int i = 0; i < reader->link_sizes[b]; i++) {
-    move_box(reader, state, state->box_pos[reader->links[b][i]], dr, dc, seen);
+    move_box(reader, state, state->box_pos[reader->links[b][i]], d, seen);
   }
 }
 
-void move_player(struct reader *reader, struct state *state, int dr, int dc) {
-  int r = state->player_pos.row;
-  int c = state->player_pos.col;
-  struct pos new_pos = {(r + dr + ROWS) % ROWS, (c + dc + COLS) % COLS};
+void move_player(struct reader *reader, struct state *state, char d) {
+  struct pos new_pos = pos_plus(state->player_pos, d);
   int seen[ROWS][COLS] = {};
-  move_box(reader, state, new_pos, dr, dc, seen);
+  move_box(reader, state, new_pos, d, seen);
   if (seen[new_pos.row][new_pos.col] == 1) {
     state->player_pos = new_pos;
   }
@@ -199,7 +209,7 @@ void print_board(struct reader *reader, struct state *state) {
       } else if (box == 0) {
         printf("   ");
       } else {
-        printf("[%d]", box);
+        printf("[ ]");
       }
     }
     printf("|\n");
@@ -211,27 +221,12 @@ void print_board(struct reader *reader, struct state *state) {
 void gameplay(struct reader *reader, struct state *state) {
   char c;
   while (scanf(" %c", &c) == 1) {
-    int dr, dc;
     switch (c) {
     case 'w':
-      dr = -1;
-      dc = 0;
-      move_player(reader, state, dr, dc);
-      break;
     case 'a':
-      dr = 0;
-      dc = -1;
-      move_player(reader, state, dr, dc);
-      break;
     case 's':
-      dr = 1;
-      dc = 0;
-      move_player(reader, state, dr, dc);
-      break;
     case 'd':
-      dr = 0;
-      dc = 1;
-      move_player(reader, state, dr, dc);
+      move_player(reader, state, c);
       break;
     case 'c':
       print_counter(reader, state);
@@ -244,12 +239,6 @@ void gameplay(struct reader *reader, struct state *state) {
       break;
     }
     print_board(reader, state);
-    for (int r = 0; r < 10; r++) {
-      for (int c = 0; c < 10; c++) {
-        printf("%d", reader->links[r][c]);
-      }
-      printf("\n");
-    }
     if (is_won(reader, state)) {
       if (reader->move_counter == 1) {
         printf("=== Level Solved in 1 Move! ===\n");
