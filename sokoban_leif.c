@@ -141,8 +141,8 @@ struct pos pos_plus(struct pos p, char d) {
 }
 
 void move_box_rec(struct reader *reader, struct state *state, struct pos p,
-                  char d, int seen[ROWS][COLS], int links[MAX_BOXES],
-                  int *links_len) {
+                  char d, int seen[ROWS][COLS], bool *moved,
+                  int links[MAX_BOXES], int *links_len) {
   int r = p.row;
   int c = p.col;
   if (seen[r][c])
@@ -158,10 +158,11 @@ void move_box_rec(struct reader *reader, struct state *state, struct pos p,
   int rr = pp.row;
   int cc = pp.col;
   state->boxes[r][c] = 0;
-  move_box_rec(reader, state, pp, d, seen, links, links_len);
+  move_box_rec(reader, state, pp, d, seen, moved, links, links_len);
   if (seen[rr][cc] == 1) {
     state->boxes[rr][cc] = b;
     state->box_pos[b] = pp;
+    *moved = true;
   } else {
     state->boxes[r][c] = b;
     seen[r][c] = 2;
@@ -173,18 +174,16 @@ void move_box_rec(struct reader *reader, struct state *state, struct pos p,
 
 void move_player(struct reader *reader, struct state *state, char d) {
   int seen[ROWS][COLS] = {};
+  bool moved = false;
   int links[MAX_BOXES] = {};
   int links_len = 0;
-  move_box_rec(reader, state, state->box_pos[1], d, seen, links, &links_len);
+  move_box_rec(reader, state, state->box_pos[1], d, seen, &moved, links,
+               &links_len);
   while (links_len > 0) {
     int b = links[--links_len];
-    move_box_rec(reader, state, state->box_pos[b], d, seen, links, &links_len);
+    move_box_rec(reader, state, state->box_pos[b], d, seen, &moved, links,
+                 &links_len);
   }
-  bool moved = false;
-  for (int r = 0; r < ROWS; r++)
-    for (int c = 0; c < COLS; c++)
-      if (seen[r][c] == 1)
-        moved = true;
   if (moved) {
     reader->move_counter++;
     reader->history[reader->move_counter] = *state;
