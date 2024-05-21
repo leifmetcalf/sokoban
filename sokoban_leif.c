@@ -15,7 +15,6 @@ struct pos {
 };
 
 struct state {
-  struct pos player_pos;
   int boxes[ROWS][COLS];
   struct pos box_pos[MAX_BOXES];
 };
@@ -81,6 +80,16 @@ void add_storage(struct reader *reader, struct state *state, int r, int c) {
   reader->board[r][c] = STORAGE;
 }
 
+void add_box_with_id(struct reader *reader, struct state *state, int id, int r,
+                     int c) {
+  reader->box_link[id] = id;
+  reader->links[id][0] = id;
+  reader->link_sizes[id] = 1;
+  state->boxes[r][c] = id;
+  struct pos p = {r, c};
+  state->box_pos[id] = p;
+}
+
 void add_box(struct reader *reader, struct state *state, int r, int c) {
   if (!in_bounds(r, c)) {
     print_invalid_loc();
@@ -89,13 +98,8 @@ void add_box(struct reader *reader, struct state *state, int r, int c) {
   if (reader->board[r][c] == WALL)
     reader->board[r][c] = NONE;
   reader->n_boxes++;
-  int n = reader->n_boxes;
-  reader->box_link[n] = n;
-  reader->links[n][0] = n;
-  reader->link_sizes[n] = 1;
-  state->boxes[r][c] = n;
-  struct pos p = {r, c};
-  state->box_pos[n] = p;
+  int b = reader->n_boxes;
+  add_box_with_id(reader, state, b, r, c);
 }
 
 void link_boxes(struct reader *reader, struct state *state, int r1, int c1,
@@ -136,8 +140,9 @@ struct pos pos_plus(struct pos p, char d) {
   return p;
 }
 
-void move_box(struct reader *reader, struct state *state, struct pos p, char d,
-              int seen[ROWS][COLS]) {
+void move_box_rec(struct reader *reader, struct state *state, struct pos p,
+                  char d, int seen[ROWS][COLS], int links[MAX_BOXES],
+                  int *links_len) {
   int r = p.row;
   int c = p.col;
   if (seen[r][c])
@@ -153,7 +158,7 @@ void move_box(struct reader *reader, struct state *state, struct pos p, char d,
   int rr = pp.row;
   int cc = pp.col;
   state->boxes[r][c] = 0;
-  move_box(reader, state, pp, d, seen);
+  move_box_rec(reader, state, pp, d, seen, links, links_len);
   if (seen[rr][cc] == 1) {
     state->boxes[rr][cc] = b;
     state->box_pos[b] = pp;
@@ -161,16 +166,20 @@ void move_box(struct reader *reader, struct state *state, struct pos p, char d,
     state->boxes[r][c] = b;
     seen[r][c] = 2;
   }
-  for (int i = 0; i < reader->link_sizes[b]; i++)
-    move_box(reader, state, state->box_pos[reader->links[b][i]], d, seen);
+  int l = reader->box_link[b];
+  for (int i = 0; i < reader->link_sizes[l]; i++)
+    links[(*links_len)++] = reader->links[l][i];
 }
 
 void move_player(struct reader *reader, struct state *state, char d) {
-  struct pos new_pos = pos_plus(state->player_pos, d);
   int seen[ROWS][COLS] = {};
-  move_box(reader, state, new_pos, d, seen);
-  if (seen[new_pos.row][new_pos.col] == 1)
-    state->player_pos = new_pos;
+  int links[MAX_BOXES] = {};
+  int links_len = 0;
+  move_box_rec(reader, state, state->box_pos[1], d, seen, links, &links_len);
+  while (links_len > 0) {
+    int b = links[--links_len];
+    move_box_rec(reader, state, state->box_pos[b], d, seen, links, &links_len);
+  }
   bool moved = false;
   for (int r = 0; r < ROWS; r++)
     for (int c = 0; c < COLS; c++)
@@ -238,7 +247,7 @@ void print_board(struct reader *reader, struct state *state) {
       printf("|");
       enum base base = reader->board[r][c];
       int box = state->boxes[r][c];
-      if (r == state->player_pos.row && c == state->player_pos.col)
+      if (box == 1)
         printf("^_^");
       else if (base == WALL)
         printf("===");
@@ -289,8 +298,8 @@ void gameplay(struct reader *reader, struct state *state) {
 }
 
 int main(void) {
-  struct reader reader = {{}, 0, {}, {}, {}, 0, {}};
-  struct state state = {{-1, -1}, {}, {}};
+  struct reader reader = {{}, 1, {}, {}, {}, 0, {}};
+  struct state state = {{}, {}};
 
   printf("=== Level Setup ===\n");
   char c;
@@ -322,17 +331,19 @@ int main(void) {
     }
     print_board(&reader, &state);
   }
+  int player_row;
+  int player_col;
   while (true) {
     printf("Enter player starting position: ");
-    if (scanf("%d %d", &state.player_pos.row, &state.player_pos.col) != 2)
+    if (scanf("%d %d", &player_row, &player_col) != 2)
       return 0;
-    if (in_bounds(state.player_pos.row, state.player_pos.col) &&
-        reader.board[state.player_pos.row][state.player_pos.col] != WALL &&
-        state.boxes[state.player_pos.row][state.player_pos.col] == 0)
+    if (in_bounds(player_row, player_col) &&
+        reader.board[player_row][player_col] != WALL &&
+        state.boxes[player_row][player_col] == 0)
       break;
-    printf("Position [%d][%d] is invalid\n", state.player_pos.row,
-           state.player_pos.col);
+    printf("Position [%d][%d] is invalid\n", player_row, player_col);
   }
+  add_box_with_id(&reader, &state, 1, player_row, player_col);
 
   printf("\n=== Starting Sokoban! ===\n");
   reader.history[0] = state;
