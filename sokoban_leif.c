@@ -37,6 +37,19 @@ bool in_bounds(int r, int c) {
 bool add_single_wall(struct reader *reader, struct state *state, int r, int c) {
   if (in_bounds(r, c)) {
     reader->board[r][c] = WALL;
+    int b = state->boxes[r][c];
+    if (b > 0) {
+      reader->n_boxes--;
+      int l = reader->box_link[b];
+      for (int i = 0; i < reader->link_sizes[l]; i++)
+        if (reader->links[l][i] == b) {
+          for (int j = i + 1; j < reader->link_sizes[l]; j++)
+            reader->links[l][j - 1] = reader->links[l][j];
+          break;
+        }
+      reader->link_sizes[l]--;
+      state->boxes[r][c] = 0;
+    }
     return true;
   }
   return false;
@@ -51,7 +64,7 @@ void add_wall(struct reader *reader, struct state *state, int r, int c) {
 
 void add_walls(struct reader *reader, struct state *state, int r1, int c1,
                int r2, int c2) {
-  if (!(in_bounds(r1, c1) && in_bounds(r2, c2))) {
+  if (!(in_bounds(r1, c1) || in_bounds(r2, c2))) {
     print_invalid_loc();
     return;
   }
@@ -281,8 +294,12 @@ int main(void) {
 
   printf("=== Level Setup ===\n");
   char c;
-  while (scanf(" %c", &c) == 1 && c != 'q') {
-    if (c == 'w') {
+  while (true) {
+    if (scanf(" %c", &c) != 1)
+      return 0;
+    if (c == 'q')
+      break;
+    else if (c == 'w') {
       int row, col;
       scanf("%d %d", &row, &col);
       add_wall(&reader, &state, row, col);
@@ -305,16 +322,16 @@ int main(void) {
     }
     print_board(&reader, &state);
   }
-
-  printf("Enter player starting position: ");
-  scanf("%d %d", &state.player_pos.row, &state.player_pos.col);
-  while (!in_bounds(state.player_pos.row, state.player_pos.col) ||
-         reader.board[state.player_pos.row][state.player_pos.col] == WALL ||
-         state.boxes[state.player_pos.row][state.player_pos.col] > 0) {
+  while (true) {
+    printf("Enter player starting position: ");
+    if (scanf("%d %d", &state.player_pos.row, &state.player_pos.col) != 2)
+      return 0;
+    if (in_bounds(state.player_pos.row, state.player_pos.col) &&
+        reader.board[state.player_pos.row][state.player_pos.col] != WALL &&
+        state.boxes[state.player_pos.row][state.player_pos.col] == 0)
+      break;
     printf("Position [%d][%d] is invalid\n", state.player_pos.row,
            state.player_pos.col);
-    printf("Enter player starting position: ");
-    scanf("%d %d", &state.player_pos.row, &state.player_pos.col);
   }
 
   printf("\n=== Starting Sokoban! ===\n");
