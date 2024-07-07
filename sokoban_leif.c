@@ -183,18 +183,23 @@ void move_box_rec(struct reader *reader, struct state *state, struct pos p,
 
 void move_player(struct reader *reader, struct state *state, char d) {
   enum seen seen[ROWS][COLS] = {};
+  bool moved = false;
   int links[MAX_BOXES] = {};
   int links_len = 0;
   struct pos p = state->box_pos[1];
   move_box_rec(reader, state, p, d, seen, links, &links_len);
-  enum seen moved = seen[p.row][p.col];
+  if (seen[p.row][p.col] == MARKED)
+    moved = true;
   while (links_len > 0) {
     int b = links[--links_len];
-    move_box_rec(reader, state, state->box_pos[b], d, seen, links, &links_len);
+    struct pos p = state->box_pos[b];
+    move_box_rec(reader, state, p, d, seen, links, &links_len);
+    if (seen[p.row][p.col] == MARKED)
+      moved = true;
   }
-  if (moved == MARKED) {
+  if (moved) {
     reader->move_counter++;
-    reader->history[reader->move_counter] = *state;
+    reader->history[reader->move_counter % MAX_HISTORY] = *state;
   }
 }
 
@@ -216,7 +221,7 @@ int is_won(struct reader *reader, struct state *state) {
 void undo(struct reader *reader, struct state *state) {
   if (reader->move_counter > 0) {
     reader->move_counter--;
-    *state = reader->history[reader->move_counter];
+    *state = reader->history[reader->move_counter % MAX_HISTORY];
   }
 }
 
