@@ -9,6 +9,8 @@
 
 enum base { NONE, WALL, STORAGE };
 
+enum seen { FRESH, LINKED, MARKED, STOPPED };
+
 struct pos {
   int row;
   int col;
@@ -141,50 +143,56 @@ struct pos pos_plus(struct pos p, char d) {
 }
 
 void move_box_rec(struct reader *reader, struct state *state, struct pos p,
-                  char d, int seen[ROWS][COLS], bool *moved,
-                  int links[MAX_BOXES], int *links_len) {
+                  char d, enum seen seen[ROWS][COLS], int links[MAX_BOXES],
+                  int *links_len) {
   int r = p.row;
   int c = p.col;
-  if (seen[r][c])
+  if (seen[r][c] == MARKED | seen[r][c] == STOPPED)
     return;
-  seen[r][c] = 1;
+  seen[r][c] = MARKED;
   int b = state->boxes[r][c];
   if (b == 0) {
     if (reader->board[r][c] == WALL)
-      seen[r][c] = 2;
+      seen[r][c] = STOPPED;
     return;
   }
   struct pos pp = pos_plus(p, d);
   int rr = pp.row;
   int cc = pp.col;
   state->boxes[r][c] = 0;
-  move_box_rec(reader, state, pp, d, seen, moved, links, links_len);
-  if (seen[rr][cc] == 1) {
+  move_box_rec(reader, state, pp, d, seen, links, links_len);
+  if (seen[rr][cc] == MARKED) {
     state->boxes[rr][cc] = b;
     state->box_pos[b] = pp;
-    *moved = true;
   } else {
     state->boxes[r][c] = b;
-    seen[r][c] = 2;
+    seen[r][c] = STOPPED;
   }
   int l = reader->box_link[b];
-  for (int i = 0; i < reader->link_sizes[l]; i++)
-    links[(*links_len)++] = reader->links[l][i];
+  for (int i = 0; i < reader->link_sizes[l]; i++) {
+    int b = reader->links[l][i];
+    struct pos p = state->box_pos[b];
+    int r = p.row;
+    int c = p.col;
+    if (seen[r][c] == FRESH) {
+      links[(*links_len)++] = b;
+      seen[r][c] = LINKED;
+    }
+  }
 }
 
 void move_player(struct reader *reader, struct state *state, char d) {
-  int seen[ROWS][COLS] = {};
-  bool moved = false;
+  enum seen seen[ROWS][COLS] = {};
   int links[MAX_BOXES] = {};
   int links_len = 0;
-  move_box_rec(reader, state, state->box_pos[1], d, seen, &moved, links,
-               &links_len);
+  struct pos p = state->box_pos[1];
+  move_box_rec(reader, state, p, d, seen, links, &links_len);
+  enum seen moved = seen[p.row][p.col];
   while (links_len > 0) {
     int b = links[--links_len];
-    move_box_rec(reader, state, state->box_pos[b], d, seen, &moved, links,
-                 &links_len);
+    move_box_rec(reader, state, state->box_pos[b], d, seen, links, &links_len);
   }
-  if (moved) {
+  if (moved == MARKED) {
     reader->move_counter++;
     reader->history[reader->move_counter] = *state;
   }
