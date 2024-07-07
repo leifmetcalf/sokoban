@@ -39,8 +39,7 @@ bool add_single_wall(struct reader *reader, struct state *state, int r, int c) {
   if (in_bounds(r, c)) {
     reader->board[r][c] = WALL;
     int b = state->boxes[r][c];
-    if (b > 0) {
-      reader->n_boxes--;
+    if (b > 1) {
       int l = reader->box_link[b];
       for (int i = 0; i < reader->link_sizes[l]; i++)
         if (reader->links[l][i] == b) {
@@ -99,8 +98,7 @@ void add_box(struct reader *reader, struct state *state, int r, int c) {
   }
   if (reader->board[r][c] == WALL)
     reader->board[r][c] = NONE;
-  reader->n_boxes++;
-  int b = reader->n_boxes;
+  int b = ++reader->n_boxes;
   add_box_with_id(reader, state, b, r, c);
 }
 
@@ -212,7 +210,7 @@ int is_won(struct reader *reader, struct state *state) {
     for (int c = 0; c < COLS; c++) {
       enum base base = reader->board[r][c];
       int box = state->boxes[r][c];
-      if (box != 0 && base != STORAGE)
+      if (box > 1 && base != STORAGE)
         return false;
     }
   return true;
